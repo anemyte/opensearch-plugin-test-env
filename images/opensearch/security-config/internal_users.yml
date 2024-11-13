@@ -1,0 +1,10 @@
+_meta:
+  type: "internalusers"
+  config_version: 2
+
+admin:
+  hash: "$2y$12$aNxaIgHj1mI4LB5Ub39xyuKJqms6HoVcNwbXdS3ArcMeh5wH0TdJq"
+  reserved: true
+  backend_roles:
+  - "admin"
+  description: "Default admin user for debugging"

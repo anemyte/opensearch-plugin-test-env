@@ -1,0 +1,70 @@
+services:
+
+  # A reverse-proxy to see contents of grafana requests to opensearch
+  opensearch-proxy:
+    build:
+      context: images/proxy
+
+  opensearch:
+    build:
+      context: images/opensearch
+    environment:
+      discovery.type: single-node
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: admin
+
+  keycloak:
+    build:
+      context: images/keycloak
+    environment:
+      KC_DB: postgres
+      KC_DB_USERNAME: &kc-db-user keycloak
+      KC_DB_PASSWORD: &kc-db-pass whatever
+      KC_DB_URL: "jdbc:postgresql://keycloak-db:5432/keycloak"
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - 8080:8080
+
+  keycloak-db:
+    image: postgres:16.4-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "keycloak"]
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: *kc-db-user
+      POSTGRES_PASSWORD: *kc-db-pass
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+
+
+  grafana:
+    image: grafana/grafana-oss:11.3.0
+    ports:
+      - 3000:3000
+    environment:
+      GF_SERVER_HTTP_PORT: "3000"
+      GF_SERVER_ROOT_URL: http://localhost:3000
+      GF_AUTH_BASIC_ENABLED: false
+      GF_AUTH_DISABLE_LOGIN_FORM: true
+      GF_AUTH_GENERIC_OAUTH_ENABLED: true
+      GF_AUTH_GENERIC_OAUTH_TLS_SKIP_VERIFY_INSECURE: true
+      GF_AUTH_GENERIC_OAUTH_NAME: Keycloak
+      GF_AUTH_GENERIC_OAUTH_USE_REFRESH_TOKEN: true
+      GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP: true
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: "grafana"
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: "AhM3KCtGrI9RpreZsRmKcap7BgBBUMuD"
+      GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_NAME: "email:primary"
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: contains(grafana_roles, 'Admin') && 'GrafanaAdmin' || 'None'
+      GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN: "true"
+      GF_AUTH_GENERIC_OAUTH_SCOPES: "openid profile email"
+      GF_AUTH_GENERIC_OAUTH_USE_PKCE: true
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: http://localhost:8080/realms/test/protocol/openid-connect/auth
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: http://keycloak:8080/realms/test/protocol/openid-connect/token
+      GF_AUTH_GENERIC_OAUTH_API_URL: http://keycloak:8080/realms/test/protocol/openid-connect/userinfo
+    volumes:
+      - grafana:/var/lib/grafana
+
+volumes:
+  keycloak-db-data:
+  grafana:
